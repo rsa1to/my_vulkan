@@ -5,6 +5,9 @@
 
 #include <vk_types.h>
 
+// bootstrap library
+#include <VkBootstrap.h>
+
 class VulkanEngine {
 public:
 
@@ -12,6 +15,18 @@ public:
 	int _frameNumber {0};
 	bool stop_rendering{ false };
 	VkExtent2D _windowExtent{ 1700 , 900 };
+
+	VkInstance _instance; // vulkan library handle
+	VkDebugUtilsMessengerEXT _debug_messenger; // vulkan debug output handle
+	VkPhysicalDevice _chosenGPU; // default gpu device
+	VkDevice _device; // vulkan device for cmds
+	VkSurfaceKHR _surface; // vulkan window surface
+
+	VkSwapchainKHR _swapchain;
+	VkFormat _swapchainImageFormat;
+	std::vector<VkImage> _swapchainImages;
+	std::vector<VkImageView> _swapchainImageViews;
+	VkExtent2D _swapchainExtent;
 
 	struct SDL_Window* _window{ nullptr };
 
@@ -28,4 +43,13 @@ public:
 
 	//run main loop
 	void run();
+
+private:
+
+	void init_vulkan();
+	void init_swapchain();
+	void init_commands();
+	void init_sync_structures();
+	void create_swapchain(uint32_t width, uint32_t height);
+	void destroy_swapchain();
 };
