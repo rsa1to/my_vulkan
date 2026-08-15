@@ -8,12 +8,31 @@
 // bootstrap library
 #include <VkBootstrap.h>
 
+struct DeletionQueue {
+	std::deque<std::function<void()>> deletors;
+
+	void push_function(std::function<void()>&& function) {
+		deletors.push_back(function);
+	}
+
+	void flush() {
+		// reverse iterate the queue to execute all the functions
+		// FILO, first destroy the objects that were added last
+		for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
+			(*it)(); // call the function
+		}
+		deletors.clear();
+	}
+}
+
 struct FrameData {
 	VkCommandPool _commandPool;
 	VkCommandBuffer _mainCommandBuffer;
 
 	VkSemaphore _swapchainSemaphore, _renderSemaphore;
 	VkFence _renderFence;
+
+	DeletionQueue _deletionQueue;
 };
 constexpr unsigned int FRAME_OVERLAP = 2;
 
@@ -42,6 +61,15 @@ public:
 	VkQueue _graphicsQueue;
 	uint32_t _graphicsQueueFamily;
 
+	DDeletionQueue _mainDeletionQueue;
+
+	// memory allocator
+	VmaAllocator _allocator;
+
+	// draw resources
+	AllocatedImage _drawImage;
+	VkExtent2D _drawExtent; // use to decide what size to render
+
 	struct SDL_Window* _window{ nullptr };
 
 	static VulkanEngine& Get();
@@ -66,4 +94,5 @@ private:
 	void init_sync_structures();
 	void create_swapchain(uint32_t width, uint32_t height);
 	void destroy_swapchain();
+	void draw_background(VkCommandBuffer cmd);
 };
