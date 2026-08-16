@@ -10,6 +10,7 @@
 
 #include <vk_initializers.h>
 #include <vk_types.h>
+#include <vk_pipelines.h>
 
 #include <chrono>
 #include <thread>
@@ -43,6 +44,10 @@ void VulkanEngine::init()
 	init_commands();
 
 	init_sync_structures();
+
+	init_descriptors();
+
+	init_pipelines();
 
 	// everything went fine
 	_isInitialized = true;
@@ -255,7 +260,7 @@ void VulkanEngine::init_vulkan()
 	allocatorInfo.physicalDevice = _chosenGPU;
 	allocatorInfo.device = _device;
 	allocatorInfo.instance = _instance;
-	allocatorInfor.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+	allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 	vmaCreateAllocator(&allocatorInfo, &_allocator);
 
 	_mainDeletionQueue.push_function([&]() {
@@ -271,7 +276,7 @@ void VulkanEngine::init_swapchain()
 	VkExtent3D drawImageExtent = { _windowExtent.width, _windowExtent.height, 1 };
 
 	// draw format is 16 bit float
-	_drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT
+	_drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 	_drawImage.imageExtent = drawImageExtent;
 
 	VkImageUsageFlags drawImageUsages = {};
@@ -332,6 +337,95 @@ void VulkanEngine::init_sync_structures()
 
 }
 
+void VulkanEngine::init_descriptors() {
+	// create a descriptor pool that will hold 10 sets with 1 image each
+	std::vector<DescriptorAllocator::PoolSizeRatio> sizes = {
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
+	};
+
+	globalDescriptorAllocator.init_pool(_device, 10, sizes);
+
+	// make the descriptor set layout
+	DescriptorLayoutBuilder builder;
+	builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+	_drawImageDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_COMPUTE_BIT);
+
+	// allocate a descriptor set for the draw image
+	_drawImageDescriptors = globalDescriptorAllocator.allocate(_device, _drawImageDescriptorLayout);
+
+	VkDescriptorImageInfo imgInfo{};
+	imgInfo.imageView = _drawImage.imageView;
+	imgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	VkWriteDescriptorSet drawImageWrite{};
+	drawImageWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	drawImageWrite.pNext = nullptr;
+
+	drawImageWrite.dstBinding = 0;
+	drawImageWrite.dstSet = _drawImageDescriptors;
+	drawImageWrite.descriptorCount = 1;
+	drawImageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	drawImageWrite.pImageInfo = &imgInfo;
+
+	vkUpdateDescriptorSets(_device, 1, &drawImageWrite, 0, nullptr);
+
+	// clean up descriptor allocator and the layout
+	_mainDeletionQueue.push_function([&]() {
+		globalDescriptorAllocator.destroy_pool(_device);
+		vkDestroyDescriptorSetLayout(_device, _drawImageDescriptorLayout, nullptr);
+	});
+}
+
+void VulkanEngine::init_pipelines() {
+	init_background_pipelines();
+}
+
+#include <filesystem>
+
+void VulkanEngine::init_background_pipelines() {
+
+	// first create the pipeline layout
+	VkPipelineLayoutCreateInfo computeLayout{};
+	computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	computeLayout.pNext = nullptr;
+	computeLayout.pSetLayouts = &_drawImageDescriptorLayout;
+	computeLayout.setLayoutCount = 1;
+
+	VK_CHECK(vkCreatePipelineLayout(_device, &computeLayout, nullptr, &_gradientPipelineLayout));
+
+	fmt::print("Current working directory: {}\n", std::filesystem::current_path().string());
+
+	// load the shader module
+	VkShaderModule computeDrawShader;
+	if(!vkutil::load_shader_module("../shaders/gradient.comp.spv", _device, &computeDrawShader)){
+		fmt::print("Error when building the compute shader \n");
+	}
+
+	VkPipelineShaderStageCreateInfo stageInfo{};
+	stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	stageInfo.pNext = nullptr;
+	stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	stageInfo.module = computeDrawShader;
+	stageInfo.pName = "main";
+
+	// create the compute pipeline
+	VkComputePipelineCreateInfo computePipelineInfo{};
+	computePipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	computePipelineInfo.pNext = nullptr;
+	computePipelineInfo.layout = _gradientPipelineLayout;
+	computePipelineInfo.stage = stageInfo;
+
+	VK_CHECK(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &computePipelineInfo, nullptr, &_gradientPipeline));
+
+	// cleanup
+	vkDestroyShaderModule(_device, computeDrawShader, nullptr);
+	_mainDeletionQueue.push_function([&]() {
+		vkDestroyPipelineLayout(_device, _gradientPipelineLayout, nullptr);
+		vkDestroyPipeline(_device, _gradientPipeline, nullptr);
+	});
+}
+
+
 void VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
 {
 	vkb::SwapchainBuilder swapchainBuilder{ _chosenGPU, _device, _surface };
@@ -372,6 +466,13 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
 
 	VkImageSubresourceRange clearRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
 
-	// clear image
-	vkCmdClearColorImage(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+	// bind the gradient drawing compute pipeline
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipeline);
+
+	// bind the descriptor set that holds the draw image
+	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors, 0, nullptr);
+
+	// execute the compute pipeline. we are using a workgroup size of 16x16,
+	// so we divide the image size by 16 to get the number of workgroups to dispatch
+	vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16), std::ceil(_drawExtent.height / 16), 1);
 }
