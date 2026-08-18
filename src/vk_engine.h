@@ -26,6 +26,22 @@ struct DeletionQueue {
 	}
 };
 
+struct ComputePushConstants {
+	glm::vec4 data1;
+	glm::vec4 data2;
+	glm::vec4 data3;
+	glm::vec4 data4;
+};
+
+struct ComputeEffect {
+    const char* name;
+
+	VkPipeline pipeline;
+	VkPipelineLayout layout;
+
+	ComputePushConstants data;
+};
+
 struct FrameData {
 	VkCommandPool _commandPool;
 	VkCommandBuffer _mainCommandBuffer;
@@ -77,13 +93,17 @@ public:
 	VkDescriptorSetLayout _drawImageDescriptorLayout;
 
 	// pipeline resource
-	VkPipeline _gradientPipeline;
+	// VkPipeline _gradientPipeline;
 	VkPipelineLayout _gradientPipelineLayout;
 
 	// immediate submit
 	VkFence _immFence;
 	VkCommandBuffer _immCommandBuffer;
 	VkCommandPool _immCommandPool;
+
+	// background color resource
+	std::vector<ComputeEffect> backgroundEffects;
+	int currentBackgroundEffect{ 0 };
 
 	struct SDL_Window* _window{ nullptr };
 
