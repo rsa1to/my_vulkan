@@ -5,6 +5,9 @@
 
 #include <vk_types.h>
 #include <vk_descriptors.h>
+#include <vk_loader.h>
+
+#include <glm/gtx/transform.hpp>
 
 // bootstrap library
 #include <VkBootstrap.h>
@@ -85,6 +88,7 @@ public:
 
 	// draw resources
 	AllocatedImage _drawImage;
+	AllocatedImage _depthImage;
 	VkExtent2D _drawExtent; // use to decide what size to render
 
 	// layout and descriptor set management
@@ -99,6 +103,9 @@ public:
 	VkPipeline _trianglePipeline;
 	VkPipeline _meshPipeline;
 	GPUMeshBuffers rectangle;
+
+	// mesh
+	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
 	// immediate submit
 	VkFence _immFence;
@@ -127,6 +134,16 @@ public:
 
 	void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
 
+	// mesh buffer
+	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+	void destroy_buffer(AllocatedBuffer& buffer);
+	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+
+	// draw
+	void draw_background(VkCommandBuffer cmd);
+	void draw_geometry(VkCommandBuffer cmd);
+	void draw_imgui(VkCommandBuffer cmd, VkImageView targetView);
+
 private:
 
 	// setup
@@ -150,14 +167,4 @@ private:
 	// swapchain
 	void create_swapchain(uint32_t width, uint32_t height);
 	void destroy_swapchain();
-
-	// mesh buffer
-	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-	void destroy_buffer(AllocatedBuffer& buffer);
-	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
-
-	// draw
-	void draw_background(VkCommandBuffer cmd);
-	void draw_geometry(VkCommandBuffer cmd);
-	void draw_imgui(VkCommandBuffer cmd, VkImageView targetView);
 };
