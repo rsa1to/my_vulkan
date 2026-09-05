@@ -98,11 +98,8 @@ public:
 
 	// pipeline resource
 	VkPipelineLayout _gradientPipelineLayout;
-	VkPipelineLayout _trianglePipelineLayout;
 	VkPipelineLayout _meshPipelineLayout;
-	VkPipeline _trianglePipeline;
 	VkPipeline _meshPipeline;
-	GPUMeshBuffers rectangle;
 
 	// mesh
 	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
