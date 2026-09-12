@@ -60,6 +60,7 @@ class VulkanEngine {
 public:
 
 	bool _isInitialized{ false };
+	bool resizeRequested{ false };
 	int _frameNumber {0};
 	bool stop_rendering{ false };
 	VkExtent2D _windowExtent{ 1700 , 900 };
@@ -90,6 +91,7 @@ public:
 	AllocatedImage _drawImage;
 	AllocatedImage _depthImage;
 	VkExtent2D _drawExtent; // use to decide what size to render
+	float renderScale { 1.f };
 
 	// layout and descriptor set management
 	DescriptorAllocator globalDescriptorAllocator;
@@ -163,5 +165,6 @@ private:
 
 	// swapchain
 	void create_swapchain(uint32_t width, uint32_t height);
+	void resize_swapchain();
 	void destroy_swapchain();
 };

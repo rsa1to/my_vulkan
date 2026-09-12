@@ -32,7 +32,7 @@ void VulkanEngine::init()
 	// We initialize SDL and create a window with it.
 	SDL_Init(SDL_INIT_VIDEO);
 
-	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
+	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
 	_window = SDL_CreateWindow(
 		"Vulkan Engine",
@@ -107,11 +107,16 @@ void VulkanEngine::draw()
 	// wait until the gpu has finished rendering the last frame. Timeout of 1 second
 	VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, VK_TRUE, 1000000000));
 	get_current_frame()._deletionQueue.flush();
-	VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
-
+	
 	// request image from the swapchain
 	uint32_t swapchainImageIndex;
-	VK_CHECK(vkAcquireNextImageKHR(_device, _swapchain, 1000000000, get_current_frame()._swapchainSemaphore, nullptr, &swapchainImageIndex));
+	VkResult e = vkAcquireNextImageKHR(_device, _swapchain, 1000000000, get_current_frame()._swapchainSemaphore, nullptr, &swapchainImageIndex);
+	if (e == VK_ERROR_OUT_OF_DATE_KHR || e == VK_SUBOPTIMAL_KHR) {
+		resizeRequested = true;
+		return;
+	}
+
+	VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
 
 	VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
 
@@ -121,8 +126,8 @@ void VulkanEngine::draw()
 	// begin the command buffer recording. the buffer is used only once, so we let vulkan know that
 	VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	
-	_drawExtent.width = _drawImage.imageExtent.width;
-	_drawExtent.height = _drawImage.imageExtent.height;
+	_drawExtent.width= std::min(_swapchainExtent.width, _drawImage.imageExtent.width) * renderScale;
+	_drawExtent.height = std::min(_swapchainExtent.height, _drawImage.imageExtent.height) * renderScale;
 
 	// start recording
 	VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
@@ -190,7 +195,11 @@ void VulkanEngine::draw()
 
 	presentInfo.pImageIndices = &swapchainImageIndex;
 
-	VK_CHECK(vkQueuePresentKHR(_graphicsQueue, &presentInfo));
+	VkResult presentResult = vkQueuePresentKHR(_graphicsQueue, &presentInfo);
+	if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR) {
+		resizeRequested = true;
+		return;
+	}
 
 	// increase the number of frames drawn
 	_frameNumber++;
@@ -234,12 +243,17 @@ void VulkanEngine::run()
 			continue;
 		}
 
+		if (resizeRequested) {
+			resize_swapchain();
+		}
+
 		// imgui new frame
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplSDL2_NewFrame();
 		ImGui::NewFrame();
 
 		if (ImGui::Begin("background")) {
+			ImGui::SliderFloat("Render Scale",&renderScale, 0.3f, 1.f);
 
 			ComputeEffect& selected = backgroundEffects[currentBackgroundEffect];
 
@@ -583,7 +597,8 @@ void VulkanEngine::init_background_pipelines()
 	});
 }
 
-void VulkanEngine::init_mesh_pipeline() {
+void VulkanEngine::init_mesh_pipeline()
+{
 	VkShaderModule triangleFragShader;
 	if (!vkutil::load_shader_module("../shaders/colored_triangle.frag.spv", _device, &triangleFragShader)) {
 		fmt::print("Error when building the triangle fragment shader module");
@@ -736,6 +751,22 @@ void VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
 		_swapchainImageViews = vkbSwapchain.get_image_views().value();
 }
 
+void VulkanEngine::resize_swapchain()
+{
+	vkDeviceWaitIdle(_device);
+
+	destroy_swapchain();
+
+	int w, h;
+	SDL_GetWindowSize(_window, &w, &h);
+	_windowExtent.width = w;
+	_windowExtent.height = h;
+
+	create_swapchain(_windowExtent.width, _windowExtent.height);
+
+	resizeRequested = false;
+}
+
 void VulkanEngine::destroy_swapchain()
 {
 	// delete the swapchain object, which will delete the images it holds internally
@@ -846,7 +877,8 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
 	vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16), std::ceil(_drawExtent.height / 16), 1);
 }
 
-void VulkanEngine::draw_geometry(VkCommandBuffer cmd) {
+void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
+{
 
 	// begin a render pass connected to our draw image
 	VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
