@@ -45,12 +45,23 @@ struct ComputeEffect {
 	ComputePushConstants data;
 };
 
+struct GPUSceneData {
+    glm::mat4 view;
+    glm::mat4 proj;
+    glm::mat4 viewproj;
+    glm::vec4 ambientColor;
+    glm::vec4 sunlightDirection; // w for intensity
+    glm::vec4 sunlightColor;
+};
+
 struct FrameData {
 	VkCommandPool _commandPool;
 	VkCommandBuffer _mainCommandBuffer;
 
 	VkSemaphore _swapchainSemaphore, _renderSemaphore;
 	VkFence _renderFence;
+
+	DescriptorAllocatorGrowable _frameDescriptors;
 
 	DeletionQueue _deletionQueue;
 };
@@ -84,6 +95,8 @@ public:
 
 	DeletionQueue _mainDeletionQueue;
 
+	DescriptorAllocator globalDescriptorAllocator;
+
 	// memory allocator
 	VmaAllocator _allocator;
 
@@ -93,10 +106,13 @@ public:
 	VkExtent2D _drawExtent; // use to decide what size to render
 	float renderScale { 1.f };
 
-	// layout and descriptor set management
-	DescriptorAllocator globalDescriptorAllocator;
+	GPUSceneData sceneData;
+
+	// descriptor set management
 	VkDescriptorSet _drawImageDescriptors;
 	VkDescriptorSetLayout _drawImageDescriptorLayout;
+	VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
+	VkDescriptorSetLayout _singleImageDescriptorLayout;
 
 	// pipeline resource
 	VkPipelineLayout _gradientPipelineLayout;
@@ -114,6 +130,15 @@ public:
 	// background color resource
 	std::vector<ComputeEffect> backgroundEffects;
 	int currentBackgroundEffect{ 0 };
+
+	// textures
+	AllocatedImage _whiteImage;
+	AllocatedImage _blackImage;
+	AllocatedImage _greyImage;
+	AllocatedImage _errorCheckerboardImage;
+
+    VkSampler _defaultSamplerLinear;
+	VkSampler _defaultSamplerNearest;
 
 	struct SDL_Window* _window{ nullptr };
 
@@ -167,4 +192,9 @@ private:
 	void create_swapchain(uint32_t width, uint32_t height);
 	void resize_swapchain();
 	void destroy_swapchain();
+
+	// image
+	AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+	AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+	void destroy_image(const AllocatedImage& img);
 };
