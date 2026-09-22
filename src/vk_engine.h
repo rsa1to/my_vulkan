@@ -29,6 +29,7 @@ struct DeletionQueue {
 	}
 };
 
+//> compute
 struct ComputePushConstants {
 	glm::vec4 data1;
 	glm::vec4 data2;
@@ -44,14 +45,46 @@ struct ComputeEffect {
 
 	ComputePushConstants data;
 };
+//< compute
+struct GLTFMetallic_Roughness {
+	MaterialPipeline opaquePipeline;
+	MaterialPipeline transparentPipeline;
 
-struct GPUSceneData {
-    glm::mat4 view;
-    glm::mat4 proj;
-    glm::mat4 viewproj;
-    glm::vec4 ambientColor;
-    glm::vec4 sunlightDirection; // w for intensity
-    glm::vec4 sunlightColor;
+	VkDescriptorSetLayout materialLayout;
+
+	struct MaterialConstants {
+		glm::vec4 colorFactors;
+		glm::vec4 metalRoughFactors;
+		// padding, we need it anyway for uniform buffers
+		glm::vec4 extra[14];
+	};
+
+	struct MaterialResources {
+		AllocatedImage colorImage;
+		VkSampler colorSampler;
+		AllocatedImage metalRoughImage;
+		VkSampler metalRoughSampler;
+		VkBuffer dataBuffer;
+		uint32_t dataBufferOffset;
+	};
+
+	DescriptorWriter writer;
+
+	void build_pipelines(VulkanEngine* engine);
+	void clear_resources(VkDevice device);
+
+	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+};
+
+struct RenderObject {
+	uint32_t indexCount;
+	uint32_t firstIndex;
+	VkBuffer indexBuffer;
+
+	MaterialInstance* material;
+
+	glm::mat4 transform;
+	VkDeviceAddress vertexBufferAddress;
 };
 
 struct FrameData {
@@ -95,7 +128,7 @@ public:
 
 	DeletionQueue _mainDeletionQueue;
 
-	DescriptorAllocator globalDescriptorAllocator;
+	DescriptorAllocatorGrowable globalDescriptorAllocator;
 
 	// memory allocator
 	VmaAllocator _allocator;
@@ -140,6 +173,10 @@ public:
     VkSampler _defaultSamplerLinear;
 	VkSampler _defaultSamplerNearest;
 
+	// material
+	MaterialInstance defaultData;
+	GLTFMetallic_Roughness metalRoughMaterial;
+
 	struct SDL_Window* _window{ nullptr };
 
 	static VulkanEngine& Get();
@@ -160,7 +197,7 @@ public:
 
 	// mesh buffer
 	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-	void destroy_buffer(AllocatedBuffer& buffer);
+	void destroy_buffer(const AllocatedBuffer& buffer);
 	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
 	// draw

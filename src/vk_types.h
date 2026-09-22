@@ -44,6 +44,16 @@ struct AllocatedBuffer {
     VmaAllocationInfo info;
 };
 
+struct GPUSceneData {
+    glm::mat4 view;
+    glm::mat4 proj;
+    glm::mat4 viewproj;
+    glm::vec4 ambientColor;
+    glm::vec4 sunlightDirection; // w for intensity
+    glm::vec4 sunlightColor;
+};
+
+//> buffer tyepes
 struct Vertex {
 
 	glm::vec3 position;
@@ -66,3 +76,23 @@ struct GPUDrawPushConstants {
     glm::mat4 worldMatrix;
     VkDeviceAddress vertexBuffer;
 };
+//< buffer types
+
+//> material
+enum class MaterialPass : uint8_t {
+    MainColor,
+    Transparent,
+    Other
+};
+
+struct MaterialPipeline {
+	VkPipeline pipeline;
+	VkPipelineLayout layout;
+};
+
+struct MaterialInstance {
+    MaterialPipeline* pipeline;
+    VkDescriptorSet materialSet;
+    MaterialPass passType;
+};
+//< material
