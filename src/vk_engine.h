@@ -46,6 +46,7 @@ struct ComputeEffect {
 	ComputePushConstants data;
 };
 //< compute
+
 struct GLTFMetallic_Roughness {
 	MaterialPipeline opaquePipeline;
 	MaterialPipeline transparentPipeline;
@@ -85,6 +86,17 @@ struct RenderObject {
 
 	glm::mat4 transform;
 	VkDeviceAddress vertexBufferAddress;
+};
+
+struct DrawContext {
+	std::vector<RenderObject> OpaqueSurfaces;
+};
+
+struct MeshNode : public Node {
+
+	std::shared_ptr<MeshAsset> mesh;
+
+	virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
 };
 
 struct FrameData {
@@ -133,13 +145,17 @@ public:
 	// memory allocator
 	VmaAllocator _allocator;
 
-	// draw resources
+	// draw image
 	AllocatedImage _drawImage;
 	AllocatedImage _depthImage;
 	VkExtent2D _drawExtent; // use to decide what size to render
 	float renderScale { 1.f };
 
+	// draw resources
 	GPUSceneData sceneData;
+	DrawContext mainDrawContext;
+	std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
+	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
 	// descriptor set management
 	VkDescriptorSet _drawImageDescriptors;
@@ -151,9 +167,6 @@ public:
 	VkPipelineLayout _gradientPipelineLayout;
 	VkPipelineLayout _meshPipelineLayout;
 	VkPipeline _meshPipeline;
-
-	// mesh
-	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
 	// immediate submit
 	VkFence _immFence;
@@ -234,4 +247,6 @@ private:
 	AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
 	AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
 	void destroy_image(const AllocatedImage& img);
+
+	void update_scene();
 };
