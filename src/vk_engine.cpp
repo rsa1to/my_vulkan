@@ -108,11 +108,13 @@ void VulkanEngine::draw()
 {
 	update_scene();
 
+//> frame clear
 	// wait until the gpu has finished rendering the last frame. Timeout of 1 second
 	VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, VK_TRUE, 1000000000));
 	
 	get_current_frame()._deletionQueue.flush();
 	get_current_frame()._frameDescriptors.clear_pools(_device);
+//< frame clear
 	
 	// request image from the swapchain
 	uint32_t swapchainImageIndex;
@@ -132,7 +134,7 @@ void VulkanEngine::draw()
 	// begin the command buffer recording. the buffer is used only once, so we let vulkan know that
 	VkCommandBufferBeginInfo cmdBeginInfo = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	
-	_drawExtent.width= std::min(_swapchainExtent.width, _drawImage.imageExtent.width) * renderScale;
+	_drawExtent.width = std::min(_swapchainExtent.width, _drawImage.imageExtent.width) * renderScale;
 	_drawExtent.height = std::min(_swapchainExtent.height, _drawImage.imageExtent.height) * renderScale;
 
 	// start recording
@@ -177,7 +179,7 @@ void VulkanEngine::draw()
 
 	VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
 
-	VkSemaphoreSubmitInfo waitInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,get_current_frame()._swapchainSemaphore);
+	VkSemaphoreSubmitInfo waitInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR, get_current_frame()._swapchainSemaphore);
 	VkSemaphoreSubmitInfo signalInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, get_current_frame()._renderSemaphore);	
 
 	VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, &signalInfo, &waitInfo);
@@ -190,9 +192,7 @@ void VulkanEngine::draw()
 	// prepare present
 	// this will display the image we just rendered to into the visible window
 	// we want to wait on the _renderSemaphore, as that semaphore ensures that drawing cmds have finished
-	VkPresentInfoKHR presentInfo = {};
-	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	presentInfo.pNext = nullptr;
+	VkPresentInfoKHR presentInfo = vkinit::present_info();
 	presentInfo.pSwapchains = &_swapchain;
 	presentInfo.swapchainCount = 1;
 
@@ -238,6 +238,7 @@ void VulkanEngine::run()
 				}
 			}
 
+			mainCamera.processSDLEvent(e);
 			// send SDL event to imgui
 			ImGui_ImplSDL2_ProcessEvent(&e);
 		}
@@ -669,7 +670,7 @@ void VulkanEngine::init_mesh_pipeline()
 	// blending
 	pipelineBuilder.disable_blending();
 	// depth test
-	pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+	pipelineBuilder.disable_depthtest();
 
 	// connect the image format we will draw into, from draw image
 	pipelineBuilder.set_color_attachment_format(_drawImage.imageFormat);
@@ -1058,14 +1059,20 @@ void VulkanEngine::update_scene()
 		loadedNodes["Cube"]->Draw(translation * scale, mainDrawContext);
 	}
 
-	sceneData.view = glm::translate(glm::vec3{0, 0, -5});
-	// camera projection
-	sceneData.proj = glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
+//> camera
+	mainCamera.update();
 
-	// invert the Y direction on projection matrix so that we are more similar
-	// to opengl and gltf axis
-	sceneData.proj[1][1] *= -1;
-	sceneData.viewproj = sceneData.proj * sceneData.view;
+	glm::mat4 view = mainCamera.get_view_matrix();
+	glm::mat4 projection = glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
+
+    // invert the Y direction on projection matrix so that we are more similar
+    // to opengl and gltf axis
+    projection[1][1] *= -1;
+
+    sceneData.view = view;
+    sceneData.proj = projection;
+    sceneData.viewproj = projection * view;
+//< camera
 
 	// some default lighting parameters
 	sceneData.ambientColor = glm::vec4(.1f);
@@ -1076,12 +1083,6 @@ void VulkanEngine::update_scene()
 
 void VulkanEngine::draw_background(VkCommandBuffer cmd)
 {
-	VkClearColorValue clearValue;
-	float flash = std::abs(std::sin(_frameNumber / 120.f));
-	clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
-
-	VkImageSubresourceRange clearRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
-	
 	// current background effect
 	ComputeEffect& effect = backgroundEffects[currentBackgroundEffect];	
 
@@ -1102,7 +1103,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 {
 	// begin a render pass connected to our draw image
 	VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	VkRenderingAttachmentInfo depthAttachment = vkinit::attachment_info(_depthImage.imageView, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+	VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
 	VkRenderingInfo renderInfo = vkinit::rendering_info(_drawExtent, &colorAttachment, &depthAttachment);
 	vkCmdBeginRendering(cmd, &renderInfo);

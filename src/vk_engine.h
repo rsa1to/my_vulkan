@@ -6,6 +6,7 @@
 #include <vk_types.h>
 #include <vk_descriptors.h>
 #include <vk_loader.h>
+#include <camera.h>
 
 #include <glm/gtx/transform.hpp>
 
@@ -110,7 +111,7 @@ struct FrameData {
 
 	DeletionQueue _deletionQueue;
 };
-constexpr unsigned int FRAME_OVERLAP = 2;
+constexpr unsigned int FRAME_OVERLAP = 3;
 
 class VulkanEngine {
 public:
@@ -189,6 +190,8 @@ public:
 	// material
 	MaterialInstance defaultData;
 	GLTFMetallic_Roughness metalRoughMaterial;
+
+	Camera mainCamera;
 
 	struct SDL_Window* _window{ nullptr };
 
