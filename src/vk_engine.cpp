@@ -58,6 +58,17 @@ void VulkanEngine::init()
 
 	init_default_data();
 
+	// initial camera params
+	mainCamera.velocity = glm::vec3(0.f);
+	mainCamera.position = glm::vec3(30.f, -00.f, -085.f);
+	mainCamera.pitch = 0;
+	mainCamera.yaw = 0;
+
+	std::string structurePath = { "../assets/structure.glb" };
+    auto structureFile = load_gltf(this,structurePath);
+    assert(structureFile.has_value());
+    loadedScenes["structure"] = *structureFile;
+
 	// everything went fine
 	_isInitialized = true;
 }
@@ -69,6 +80,8 @@ void VulkanEngine::cleanup()
 		// ensure gpu has finished its work
 		vkDeviceWaitIdle(_device);
 
+		loadedScenes.clear();
+
 		// free per-frame structures and deletion queue
 		for (int i = 0; i < FRAME_OVERLAP; i++) {
 			vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
@@ -79,11 +92,6 @@ void VulkanEngine::cleanup()
 			vkDestroySemaphore(_device, _frames[i]._renderSemaphore, nullptr);
 
 			_frames[i]._deletionQueue.flush();
-		}
-
-		for (auto& mesh : testMeshes) {
-			destroy_buffer(mesh->meshBuffers.indexBuffer);
-			destroy_buffer(mesh->meshBuffers.vertexBuffer);
 		}
 
 		metalRoughMaterial.clear_resources(_device);
@@ -690,9 +698,6 @@ void VulkanEngine::init_mesh_pipeline()
 }
 
 void VulkanEngine::init_default_data() {
-	// load test mesh
-	testMeshes = loadGltfMeshes(this, "../assets/basicmesh.glb").value();
-
 //> default image
 	// 3 default textures, white, grey, black. 1 pixel each
 	uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
@@ -765,21 +770,6 @@ void VulkanEngine::init_default_data() {
 
 	defaultData = metalRoughMaterial.write_material(_device, MaterialPass::MainColor, materialResources, globalDescriptorAllocator);
 //< default material
-
-	// create mesh nodes for each loaded mesh and assign default materials
-	for (auto& m : testMeshes) {
-		std::shared_ptr<MeshNode> newNode = std::make_shared<MeshNode>();
-		newNode->mesh = m;
-
-		newNode->localTransform = glm::mat4(1.0f);
-		newNode->worldTransform = glm::mat4(1.0f);
-
-		for (auto& s : newNode->mesh->surfaces) {
-			s.material = std::make_shared<GLTFMaterial>(defaultData);
-		}
-
-		loadedNodes[m->name] = std::move(newNode);
-	}
 }
 
 void VulkanEngine::init_imgui()
@@ -997,7 +987,7 @@ void VulkanEngine::destroy_image(const AllocatedImage& img)
     vmaDestroyImage(_allocator, img.image, img.allocation);
 }
 
-GPUMeshBuffers VulkanEngine::uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices)
+GPUMeshBuffers VulkanEngine::upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices)
 {
 	const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
 	const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
@@ -1050,14 +1040,7 @@ void VulkanEngine::update_scene()
 {
 	mainDrawContext.OpaqueSurfaces.clear();
 
-	loadedNodes["Suzanne"]->Draw(glm::mat4{1.f}, mainDrawContext);	
-
-	for (int x = -3; x < 3; x++) {
-		glm::mat4 scale = glm::scale(glm::vec3{0.2});
-		glm::mat4 translation =  glm::translate(glm::vec3{x, 1, 0});
-
-		loadedNodes["Cube"]->Draw(translation * scale, mainDrawContext);
-	}
+	loadedScenes["structure"]->Draw(glm::mat4{1.f}, mainDrawContext);
 
 //> camera
 	mainCamera.update();

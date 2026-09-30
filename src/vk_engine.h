@@ -156,7 +156,7 @@ public:
 	GPUSceneData sceneData;
 	DrawContext mainDrawContext;
 	std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
-	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
+	std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
 
 	// descriptor set management
 	VkDescriptorSet _drawImageDescriptors;
@@ -178,7 +178,7 @@ public:
 	std::vector<ComputeEffect> backgroundEffects;
 	int currentBackgroundEffect{ 0 };
 
-	// textures
+	// default textures
 	AllocatedImage _whiteImage;
 	AllocatedImage _blackImage;
 	AllocatedImage _greyImage;
@@ -214,7 +214,7 @@ public:
 	// mesh buffer
 	AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 	void destroy_buffer(const AllocatedBuffer& buffer);
-	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+	GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
 	// draw
 	void draw_background(VkCommandBuffer cmd);
@@ -233,7 +233,6 @@ private:
 	// pipeline
 	void init_pipelines();
 	void init_background_pipelines();
-	void init_triangle_pipeline();
 	void init_mesh_pipeline();
 
 	void init_default_data();
