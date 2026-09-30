@@ -3,10 +3,11 @@
 
 #pragma once
 
-#include <vk_types.h>
-#include <vk_descriptors.h>
-#include <vk_loader.h>
-#include <camera.h>
+#include "vk_types.h"
+#include "vk_descriptors.h"
+#include "vk_pipelines.h"
+#include "vk_loader.h"
+#include "camera.h"
 
 #include <glm/gtx/transform.hpp>
 
@@ -39,7 +40,7 @@ struct ComputePushConstants {
 };
 
 struct ComputeEffect {
-    const char* name;
+	const char* name;
 
 	VkPipeline pipeline;
 	VkPipelineLayout layout;
@@ -184,7 +185,7 @@ public:
 	AllocatedImage _greyImage;
 	AllocatedImage _errorCheckerboardImage;
 
-    VkSampler _defaultSamplerLinear;
+	VkSampler _defaultSamplerLinear;
 	VkSampler _defaultSamplerNearest;
 
 	// material

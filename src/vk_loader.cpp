@@ -1,10 +1,10 @@
-﻿#include "stb_image.h"
-#include <iostream>
-#include <vk_loader.h>
-
-#include "vk_engine.h"
-#include "vk_initializers.h"
+﻿#include "vk_loader.h"
 #include "vk_types.h"
+#include "vk_engine.h"
+
+#include <stb_image.h>
+#include <iostream>
+
 #include <glm/gtx/quaternion.hpp>
 
 #include <fastgltf/glm_element_traits.hpp>
@@ -322,7 +322,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> load_gltf(VulkanEngine* engine, std::
 	for (auto& node : nodes) {
 		if (node->parent.lock() == nullptr) {
 			file.topNodes.push_back(node);
-			node->refreshTransform(glm::mat4 { 1.f });
+			node->refresh_transform(glm::mat4 { 1.f });
 		}
 	}
 	return scene;

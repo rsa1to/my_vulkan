@@ -1,16 +1,13 @@
 ﻿//> includes
 #include "vk_engine.h"
 #include "vk_images.h"
+#include "vk_initializers.h"
 
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
 
 #include <SDL.h>
 #include <SDL_vulkan.h>
-
-#include <vk_initializers.h>
-#include <vk_types.h>
-#include <vk_pipelines.h>
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -65,9 +62,9 @@ void VulkanEngine::init()
 	mainCamera.yaw = 0;
 
 	std::string structurePath = { "../assets/structure.glb" };
-    auto structureFile = load_gltf(this,structurePath);
-    assert(structureFile.has_value());
-    loadedScenes["structure"] = *structureFile;
+	auto structureFile = load_gltf(this,structurePath);
+	assert(structureFile.has_value());
+	loadedScenes["structure"] = *structureFile;
 
 	// everything went fine
 	_isInitialized = true;
@@ -246,7 +243,7 @@ void VulkanEngine::run()
 				}
 			}
 
-			mainCamera.processSDLEvent(e);
+			mainCamera.process_SDL_event(e);
 			// send SDL event to imgui
 			ImGui_ImplSDL2_ProcessEvent(&e);
 		}
@@ -362,7 +359,7 @@ void VulkanEngine::init_vulkan()
 	// get the VkDevice handle used in the rest of the application
 	_device = vkbDevice.device;
 	_chosenGPU = physicalDevice.physical_device;
-	// fmt::print("Using GPU: {}\n", physicalDevice.name);
+	fmt::println("Using GPU: {}\n", physicalDevice.name);
 
 	// get graphics queue
 	_graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
@@ -578,12 +575,12 @@ void VulkanEngine::init_background_pipelines()
 
 	VkShaderModule gradientShader;
 	if (!vkutil::load_shader_module("../shaders/gradient_color.comp.spv", _device, &gradientShader)) {
-		fmt::print("Error when building the compute shader \n");
+		fmt::println("Error when building the compute shader \n");
 	}
 
 	VkShaderModule skyShader;
 	if (!vkutil::load_shader_module("../shaders/sky.comp.spv", _device, &skyShader)) {
-		fmt::print("Error when building the compute shader \n");
+		fmt::println("Error when building the compute shader \n");
 	}
 
 	VkPipelineShaderStageCreateInfo stageInfo{};
@@ -640,12 +637,12 @@ void VulkanEngine::init_mesh_pipeline()
 {
 	VkShaderModule triangleFragShader;
 	if (!vkutil::load_shader_module("../shaders/tex_image.frag.spv", _device, &triangleFragShader)) {
-		fmt::print("Error when building the triangle fragment shader module");
+		fmt::println("Error when building the triangle fragment shader module");
 	}
 
 	VkShaderModule triangleVertexShader;
 	if (!vkutil::load_shader_module("../shaders/colored_triangle_mesh.vert.spv", _device, &triangleVertexShader)) {
-		fmt::print("Error when building the triangle vertex shader module");
+		fmt::println("Error when building the triangle vertex shader module");
 	}
 
 	VkPushConstantRange bufferRange{};
@@ -983,8 +980,8 @@ AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat 
 
 void VulkanEngine::destroy_image(const AllocatedImage& img)
 {
-    vkDestroyImageView(_device, img.imageView, nullptr);
-    vmaDestroyImage(_allocator, img.image, img.allocation);
+	vkDestroyImageView(_device, img.imageView, nullptr);
+	vmaDestroyImage(_allocator, img.image, img.allocation);
 }
 
 GPUMeshBuffers VulkanEngine::upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices)
@@ -1048,13 +1045,13 @@ void VulkanEngine::update_scene()
 	glm::mat4 view = mainCamera.get_view_matrix();
 	glm::mat4 projection = glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
 
-    // invert the Y direction on projection matrix so that we are more similar
-    // to opengl and gltf axis
-    projection[1][1] *= -1;
+	// invert the Y direction on projection matrix so that we are more similar
+	// to opengl and gltf axis
+	projection[1][1] *= -1;
 
-    sceneData.view = view;
-    sceneData.proj = projection;
-    sceneData.viewproj = projection * view;
+	sceneData.view = view;
+	sceneData.proj = projection;
+	sceneData.viewproj = projection * view;
 //< camera
 
 	// some default lighting parameters
@@ -1182,15 +1179,15 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
 	matrixRange.size = sizeof(GPUDrawPushConstants);
 	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-    DescriptorLayoutBuilder layoutBuilder;
-    layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	DescriptorLayoutBuilder layoutBuilder;
+	layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+	layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 	layoutBuilder.add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
-    materialLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+	materialLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
 	VkDescriptorSetLayout layouts[] = { engine->_gpuSceneDataDescriptorLayout,
-        materialLayout };
+		materialLayout };
 
 	VkPipelineLayoutCreateInfo meshLayoutInfo = vkinit::pipeline_layout_create_info();
 	meshLayoutInfo.setLayoutCount = 2;
@@ -1201,8 +1198,8 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
 	VkPipelineLayout newLayout;
 	VK_CHECK(vkCreatePipelineLayout(engine->_device, &meshLayoutInfo, nullptr, &newLayout));
 
-    opaquePipeline.layout = newLayout;
-    transparentPipeline.layout = newLayout;
+	opaquePipeline.layout = newLayout;
+	transparentPipeline.layout = newLayout;
 
 	// build the stage-create-info for both vertex and fragment stages. This lets
 	// the pipeline know the shader modules per stage
@@ -1223,7 +1220,7 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
 	pipelineBuilder._pipelineLayout = newLayout;
 
 	// finally build the pipeline
-    opaquePipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device);
+	opaquePipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device);
 
 	// create the transparent variant
 	pipelineBuilder.enable_blending_additive();
