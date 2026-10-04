@@ -1036,6 +1036,7 @@ GPUMeshBuffers VulkanEngine::upload_mesh(std::span<uint32_t> indices, std::span<
 void VulkanEngine::update_scene()
 {
 	mainDrawContext.OpaqueSurfaces.clear();
+	mainDrawContext.TransparentSurfaces.clear();
 
 	loadedScenes["structure"]->Draw(glm::mat4{1.f}, mainDrawContext);
 
@@ -1107,8 +1108,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 	writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 	writer.update_set(_device, globalDescriptor);
 
-	for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces) {
-
+	auto draw = [&](const RenderObject& draw) {
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
 
 		// set dynamic viewport and scissor
@@ -1145,6 +1145,14 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
 		// draw the indexed geometry
 		vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
+	};
+
+	for (auto& r : mainDrawContext.OpaqueSurfaces) {
+		draw(r);
+	}
+
+	for (auto& r : mainDrawContext.TransparentSurfaces) {
+		draw(r);
 	}
 
 	vkCmdEndRendering(cmd);
@@ -1279,7 +1287,12 @@ void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
 		def.transform = nodeMatrix;
 		def.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
 
-		ctx.OpaqueSurfaces.push_back(def);
+		if (s.material->data.passType == MaterialPass::Transparent) {
+			ctx.TransparentSurfaces.push_back(def);
+		}
+		else {
+			ctx.OpaqueSurfaces.push_back(def);
+		}
 	}
 
 	// recursively draw child nodes
