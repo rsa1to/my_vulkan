@@ -26,7 +26,7 @@ VkCommandBufferAllocateInfo vkinit::command_buffer_allocate_info(
 	return info;
 }
 //< init_cmd
-// 
+
 //> init_cmd_draw
 VkCommandBufferBeginInfo vkinit::command_buffer_begin_info(VkCommandBufferUsageFlags flags /*= 0*/)
 {

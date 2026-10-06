@@ -14,6 +14,14 @@
 // bootstrap library
 #include <VkBootstrap.h>
 
+struct EngineStats {
+    float frameTime;  // global frame time
+    int triangleCount;
+    int drawcallCount;
+    float sceneUpdateTime;
+    float meshDrawTime;
+};
+
 struct DeletionQueue {
 	std::deque<std::function<void()>> deletors;
 
@@ -85,7 +93,7 @@ struct RenderObject {
 	VkBuffer indexBuffer;
 
 	MaterialInstance* material;
-
+	Bounds bounds;
 	glm::mat4 transform;
 	VkDeviceAddress vertexBufferAddress;
 };
@@ -117,6 +125,8 @@ constexpr unsigned int FRAME_OVERLAP = 3;
 
 class VulkanEngine {
 public:
+
+	EngineStats stats;
 
 	bool _isInitialized{ false };
 	bool resizeRequested{ false };
@@ -228,6 +238,9 @@ public:
 	void draw_geometry(VkCommandBuffer cmd);
 	void draw_imgui(VkCommandBuffer cmd, VkImageView targetView);
 
+	// frustum culling
+	bool is_visible(const RenderObject& obj, const glm::mat4& viewproj);
+
 private:
 
 	// setup
@@ -243,6 +256,7 @@ private:
 	void init_mesh_pipeline();
 
 	void init_default_data();
+	void init_scene();
 
 	// imgui
 	void init_imgui();

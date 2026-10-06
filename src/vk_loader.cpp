@@ -35,7 +35,7 @@ std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& 
 					imagesize.height = height;
 					imagesize.depth = 1;
 
-					newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+					newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
 
 					stbi_image_free(data);
 				}
@@ -49,7 +49,7 @@ std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& 
 					imagesize.height = height;
 					imagesize.depth = 1;
 
-					newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT,false);
+					newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
 
 					stbi_image_free(data);
 				}
@@ -73,7 +73,7 @@ std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& 
 									   imagesize.depth = 1;
 
 									   newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,
-										   VK_IMAGE_USAGE_SAMPLED_BIT,false);
+										   VK_IMAGE_USAGE_SAMPLED_BIT, true);
 
 									   stbi_image_free(data);
 								   }
@@ -348,11 +348,25 @@ std::optional<std::shared_ptr<LoadedGLTF>> load_gltf(VulkanEngine* engine, std::
 					});
 			}
 
+			// assign material
 			if (p.materialIndex.has_value()) {
 				newSurface.material = materials[p.materialIndex.value()];
 			} else {
 				newSurface.material = materials[0];
 			}
+
+			// loop the vertices of the surface to calculate its bounds
+			glm::vec3 minPos = vertices[initial_vtx].position;
+			glm::vec3 maxPos = vertices[initial_vtx].position;
+
+			for (size_t i = initial_vtx; i < vertices.size(); i++) {
+				minPos = glm::min(minPos, vertices[i].position);
+				maxPos = glm::max(maxPos, vertices[i].position);
+			}
+
+			newSurface.bounds.origin = (minPos + maxPos) / 2.0f;
+			newSurface.bounds.extents = (maxPos - minPos) / 2.0f;
+			newSurface.bounds.sphereRadius = glm::length(newSurface.bounds.extents);
 
 			newmesh->surfaces.push_back(newSurface);
 		}
@@ -360,6 +374,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> load_gltf(VulkanEngine* engine, std::
 		newmesh->meshBuffers = engine->upload_mesh(indices, vertices);
 	}
 //< meshes
+
+	
 
 //> nodes
 	// load all nodes and their meshes
