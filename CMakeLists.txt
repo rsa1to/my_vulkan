@@ -3,7 +3,7 @@
 #
 cmake_minimum_required (VERSION 3.8)
 
-project ("vulkan_guide")
+project ("my_vulkan")
 
 
 find_package(Vulkan REQUIRED)
